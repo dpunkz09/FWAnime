@@ -9,9 +9,23 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@heroui/react": "^3.2.3",
+    "@heroui/styles": "^3.2.3",
+    "@react-aria/ssr": "^3.10.1",
+    "@react-aria/utils": "^3.34.1",
+    "@supabase/supabase-js": "^2.112.0",
+    "@types/uuid": "^10.0.0",
+    "@vidstack/react": "^0.6.15",
+    "dseg": "^0.46.0",
+    "graphql": "^16.14.2",
+    "graphql-request": "^7.4.0",
+    "hls.js": "1.6.16",
+    "lucide-react": "^1.28.0",
     "next": "16.2.12",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "uuid": "^14.0.1",
+    "vidstack": "^0.6.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

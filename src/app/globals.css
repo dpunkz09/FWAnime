@@ -1,26 +1,48 @@
 @import "tailwindcss";
+@import "@heroui/styles/css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-blue: #3db4f2;
+  --color-blue-dark: #2b8fd6;
+  --color-bg: #0b1622;
+  --color-surface: #151f2e;
+  --color-surface-alt: #1a2233;
+  --color-nav: #1a2233;
+  --color-border: #2b3d52;
+  --color-text: #9ab0cc;
+  --color-text-muted: #516170;
+  --color-heading: #c0ccd8;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Overpass", "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* scrollbar */
+::-webkit-scrollbar {
+  height: 4px;
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2b3d52;
+  border-radius: 4px;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

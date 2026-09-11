@@ -1,65 +1,204 @@
-import Image from "next/image";
+import {
+  fetchAniList,
+  TRENDING_ANIME_QUERY,
+  POPULAR_SEASON_QUERY,
+  UPCOMING_SEASON_QUERY,
+  ALL_TIME_POPULAR_QUERY,
+  TRENDING_BY_PERIOD_QUERY,
+  AIRING_SCHEDULE_QUERY,
+  UPCOMING_EPISODES_QUERY,
+  TRENDING_CHARACTERS_QUERY,
+  GENRE_COLLECTION_QUERY,
+  getCurrentSeason,
+  getNextSeason,
+  PageData,
+  AiringScheduleData,
+  AiringEntry,
+  UpcomingEpisodesData,
+  TrendingCharactersData,
+  GenreCollectionData,
+} from "@/lib/anilist";
+import HeroBanner from "@/components/HeroBanner";
+import MediaSection from "@/components/MediaSection";
+import Top10Section from "@/components/Top10Section";
+import AnimeSchedule from "@/components/AnimeSchedule";
+import GenreStrip from "@/components/GenreStrip";
+import CTABanner from "@/components/CTABanner";
+import ContinueWatching from "@/components/ContinueWatching";
+import EpisodeCountdown from "@/components/EpisodeCountdown";
+import TrendingCharacters from "@/components/TrendingCharacters";
 
-export default function Home() {
+const SEASON_LABELS: Record<string, string> = {
+  WINTER: "Winter",
+  SPRING: "Spring",
+  SUMMER: "Summer",
+  FALL: "Fall",
+};
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// Build the 7-day schedule windows starting from today
+function buildScheduleDays(allEntries: AiringEntry[]) {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const dayStart = new Date(todayStart);
+    dayStart.setDate(todayStart.getDate() + i);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayStart.getDate() + 1);
+
+    const fromTs = Math.floor(dayStart.getTime() / 1000);
+    const toTs = Math.floor(dayEnd.getTime() / 1000);
+
+    const entries = allEntries.filter(
+      (e) => e.airingAt >= fromTs && e.airingAt < toTs
+    );
+
+    const label = DAY_LABELS[dayStart.getDay()];
+    const date = `${MONTH_LABELS[dayStart.getMonth()]} ${dayStart.getDate()}`;
+    const dayNum = dayStart.getDate();
+
+    return { label, date, dayNum, isToday: i === 0, entries };
+  });
+}
+
+export default async function HomePage() {
+  const { season, year } = getCurrentSeason();
+  const { season: nextSeason, year: nextYear } = getNextSeason();
+
+  // Fetch airing schedule: next 8 days window to cover full 7-day view
+  const now = Math.floor(Date.now() / 1000);
+  const todayMidnight = now - (now % 86400); // UTC midnight — close enough
+  const weekEnd = todayMidnight + 8 * 86400;
+
+  // Batch 1 — primary content (most important, above the fold)
+  const [
+    trendingData,
+    popularSeasonData,
+    upcomingSeasonData,
+    allTimePopularData,
+    genreData,
+  ] = await Promise.all([
+    fetchAniList<PageData>(TRENDING_ANIME_QUERY, { page: 1, perPage: 20 }),
+    fetchAniList<PageData>(POPULAR_SEASON_QUERY, {
+      season, seasonYear: year, page: 1, perPage: 10,
+    }),
+    fetchAniList<PageData>(UPCOMING_SEASON_QUERY, {
+      season: nextSeason, seasonYear: nextYear, page: 1, perPage: 10,
+    }),
+    fetchAniList<PageData>(ALL_TIME_POPULAR_QUERY, { page: 1, perPage: 10 }),
+    fetchAniList<GenreCollectionData>(GENRE_COLLECTION_QUERY),
+  ]);
+
+  // Batch 2 — sidebar + schedule (secondary content)
+  const [
+    topDayData,
+    topWeekData,
+    topMonthData,
+    scheduleData,
+    upcomingEpisodesData,
+    trendingCharactersData,
+  ] = await Promise.all([
+    fetchAniList<PageData>(TRENDING_BY_PERIOD_QUERY, {
+      sort: ["TRENDING_DESC"], page: 1, perPage: 10,
+    }),
+    fetchAniList<PageData>(TRENDING_BY_PERIOD_QUERY, {
+      sort: ["POPULARITY_DESC"], page: 1, perPage: 10,
+    }),
+    fetchAniList<PageData>(TRENDING_BY_PERIOD_QUERY, {
+      sort: ["SCORE_DESC"], page: 1, perPage: 10,
+    }),
+    fetchAniList<AiringScheduleData>(AIRING_SCHEDULE_QUERY, {
+      from: todayMidnight,
+      to: weekEnd,
+      page: 1,
+      perPage: 50,
+    }),
+    fetchAniList<UpcomingEpisodesData>(UPCOMING_EPISODES_QUERY, {
+      from: now,
+      to: now + 48 * 3600,
+    }),
+    fetchAniList<TrendingCharactersData>(TRENDING_CHARACTERS_QUERY, {
+      page: 1,
+      perPage: 10,
+    }),
+  ]);
+
+  const trending = trendingData.Page.media;
+  const popularSeason = popularSeasonData.Page.media;
+  const upcomingSeason = upcomingSeasonData.Page.media;
+  const allTimePopular = allTimePopularData.Page.media;
+  const scheduleDays = buildScheduleDays(scheduleData.Page.airingSchedules);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <>
+      {/* Hero Banner */}
+      <HeroBanner items={trending} />
+
+      {/* Two-column layout */}
+      <div className="max-w-[1300px] mx-auto px-4 sm:px-6 py-8">
+        <div className="flex gap-8 items-start">
+
+          {/* ── Main feed ── */}
+          <div className="flex-1 min-w-0">
+            {/* Continue Watching — client, reads localStorage */}
+            <ContinueWatching />
+
+            <MediaSection
+              title="Trending Now"
+              items={trending}
+              viewAllHref="/anime/trending"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+            {/* Genre strip */}
+            <GenreStrip genres={genreData.GenreCollection} />
+
+            <MediaSection
+              title="Popular This Season"
+              subtitle={`${SEASON_LABELS[season]} ${year}`}
+              items={popularSeason}
+              viewAllHref="/anime/seasonal"
+            />
+
+            {/* CTA banner */}
+            <CTABanner />
+
+            <MediaSection
+              title="Upcoming Next Season"
+              subtitle={`${SEASON_LABELS[nextSeason]} ${nextYear}`}
+              items={upcomingSeason}
+              viewAllHref="/anime/upcoming"
+            />
+
+            <MediaSection
+              title="All Time Popular"
+              items={allTimePopular}
+              viewAllHref="/anime/popular"
+            />
+
+            {/* Airing Schedule */}
+            <AnimeSchedule days={scheduleDays} />
+          </div>
+
+          {/* ── Right sidebar ── */}
+          <div className="hidden lg:block shrink-0 w-[280px]">
+            <EpisodeCountdown
+              episodes={upcomingEpisodesData.Page.airingSchedules}
+            />
+            <TrendingCharacters
+              characters={trendingCharactersData.Page.characters}
+            />
+            <Top10Section
+              day={topDayData.Page.media}
+              week={topWeekData.Page.media}
+              month={topMonthData.Page.media}
+            />
+          </div>
+
         </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }
