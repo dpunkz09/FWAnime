@@ -12,6 +12,7 @@ export async function fetchAniList<T>(
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        "User-Agent": "FWAnime/1.0 (https://github.com/fwanime; contact@fwanime.app)",
       },
       body: JSON.stringify({ query, variables }),
       next: { revalidate },
@@ -27,7 +28,17 @@ export async function fetchAniList<T>(
     }
 
     if (!res.ok) {
-      throw new Error(`AniList API error: ${res.status}`);
+      // Try to surface a descriptive message from the response body (e.g. outage notices)
+      let detail = `AniList API error: ${res.status}`;
+      try {
+        const errJson = await res.clone().json();
+        if (errJson?.errors?.[0]?.message) {
+          detail = errJson.errors[0].message;
+        }
+      } catch {
+        // ignore parse failures — use the default message
+      }
+      throw new Error(detail);
     }
 
     const json = await res.json();
