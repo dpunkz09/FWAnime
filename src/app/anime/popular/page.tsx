@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { fetchAniList, ANIME_LIST_QUERY, AnimeListData } from "@/lib/anilist";
 import AnimeListPage from "@/components/AnimeListPage";
 

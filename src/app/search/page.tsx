@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { fetchAniList, Media } from "@/lib/anilist";
 import MediaCard from "@/components/MediaCard";
 import { Chip } from "@heroui/react";

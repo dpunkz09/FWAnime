@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import {
   fetchAniList,
   TRENDING_ANIME_QUERY,
