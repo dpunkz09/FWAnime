@@ -16,6 +16,7 @@
     "@supabase/supabase-js": "^2.112.0",
     "@types/uuid": "^10.0.0",
     "@vidstack/react": "^0.6.15",
+    "crypto-js": "^4.2.0",
     "dseg": "^0.46.0",
     "graphql": "^16.14.2",
     "graphql-request": "^7.4.0",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

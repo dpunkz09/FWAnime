@@ -7,16 +7,9 @@ import { useRouter } from "next/navigation";
 import { Button, ScrollShadow, Spinner, Breadcrumbs, Separator } from "@heroui/react";
 import { Play, ChevronLeft, ChevronRight, SkipBack, SkipForward, ListEnd } from "lucide-react";
 import { useProgress } from "@/hooks/useProgress";
-import JWPlayer from "@/components/JWPlayer";
 
 const AUTO_NEXT_KEY = "fw_auto_next";
 
-interface TrackInfo { file: string; label?: string; kind: string; default?: boolean }
-interface StreamData {
-  m3u8?: string; proxiedUrl?: string; stream?: string; url?: string;
-  sources?: { url: string }[];
-  tracks?: TrackInfo[];
-}
 interface Episode { episode: number; airingAt: number }
 interface RelatedMedia {
   id: number;
@@ -40,7 +33,6 @@ interface Props {
   related: RelatedMedia[];
 }
 
-const CORS_PROXY = "https://watch.flixworld.xyz/api/v1/streamingProxy?url=";
 const PER_PAGE = 20;
 
 const RELATION_LABELS: Record<string, string> = {
@@ -56,8 +48,7 @@ export default function WatchClient({
   const router = useRouter();
   const [episode, setEpisode] = useState(initialEpisode);
   const [type, setType] = useState<"sub" | "dub">(initialType);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [tracks, setTracks] = useState<TrackInfo[]>([]);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [epPage, setEpPage] = useState(0);
@@ -79,26 +70,21 @@ export default function WatchClient({
     );
   }, [episode, type, animeId, malId, router]);
 
-  // Fetch stream URL from the anime API
+  // Generate embed URL from megaplay.buzz
   useEffect(() => {
-    if (!malId) { setError("No MAL ID available"); setLoading(false); return; }
-    setLoading(true); setError(null); setStreamUrl(null); setTracks([]);
-
-    fetch(`https://api.flikhub.net/megaplay?mal=${malId}&ep=${episode}&type=${type}`)
-      .then((r) => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() as Promise<StreamData>; })
-      .then((data) => {
-        const raw = data.m3u8 ?? data.proxiedUrl ?? data.stream ?? data.url ?? data.sources?.[0]?.url ?? null;
-        if (!raw) throw new Error("No stream URL in response");
-        setStreamUrl(`${CORS_PROXY}${encodeURIComponent(raw)}`);
-        if (data.tracks) {
-          setTracks(data.tracks.map((t) => ({
-            ...t,
-            file: `${CORS_PROXY}${encodeURIComponent(t.file)}`,
-          })));
-        }
-      })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+    if (!malId) { 
+      setError("No MAL ID available"); 
+      setLoading(false); 
+      return; 
+    }
+    
+    setLoading(true); 
+    setError(null);
+    
+    // Build embed URL: https://megaplay.buzz/stream/mal/{mal_id}/{episode}/{sub|dub}
+    const url = `https://megaplay.buzz/stream/mal/${malId}/${episode}/${type}`;
+    setEmbedUrl(url);
+    setLoading(false);
   }, [malId, episode, type]);
 
   const prevEp = airedEpisodes.find((e) => e.episode === episode - 1);
@@ -107,63 +93,39 @@ export default function WatchClient({
   // ── Progress tracking ────────────────────────────────────────────────────
   const { fetchProgress, recordProgress, flushProgress } = useProgress();
 
-  // Stable refs so callbacks passed to JWPlayer never carry stale closure values
+  // Stable refs so callbacks never carry stale closure values
   const episodeRef = useRef(episode);
   const typeRef    = useRef(type);
   useEffect(() => { episodeRef.current = episode; }, [episode]);
   useEffect(() => { typeRef.current    = type;    }, [type]);
 
-  // How many seconds to resume from (0 = start from beginning)
-  const resumeTargetRef = useRef(0);
+  // Track last saved time to avoid excessive DB writes
+  const lastSavedTimeRef = useRef(0);
 
-  // Fetch saved progress whenever episode/type changes
+  // Register the episode in the DB when it starts loading
   useEffect(() => {
-    resumeTargetRef.current = 0;
+    if (!embedUrl) return;
+    
+    // Fetch saved progress to potentially resume
     let cancelled = false;
     fetchProgress(animeId).then((saved) => {
       if (cancelled) return;
-      if (saved && saved.episode === episode && saved.type === type && saved.playbackTime > 10) {
-        resumeTargetRef.current = saved.playbackTime;
-      }
+      
+      // Register this episode view
+      fetch("/api/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          animeId, malId, title, coverImage, accent,
+          episode, type,
+          playbackTime: saved?.episode === episode && saved?.type === type ? saved.playbackTime : 0,
+          duration: saved?.episode === episode && saved?.type === type ? saved.duration : 0,
+        }),
+      }).catch(() => {});
     });
+    
     return () => { cancelled = true; };
-  }, [animeId, episode, type, fetchProgress]);
-
-  // Register the episode in the DB as soon as the stream URL resolves
-  useEffect(() => {
-    if (!streamUrl) return;
-    fetch("/api/progress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        animeId, malId, title, coverImage, accent,
-        episode, type,
-        playbackTime: resumeTargetRef.current,
-        duration: 0,
-      }),
-    }).catch(() => {});
-  }, [streamUrl, episode, type]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Callbacks handed to JWPlayer — stable identity via useCallback
-  const handleTimeUpdate = useCallback((currentTime: number, duration: number) => {
-    recordProgress({
-      animeId, malId, title, coverImage, accent,
-      episode: episodeRef.current,
-      type: typeRef.current,
-      playbackTime: currentTime,
-      duration,
-    });
-  }, [animeId, malId, title, coverImage, accent, recordProgress]);
-
-  const handlePause = useCallback((currentTime: number, duration: number) => {
-    flushProgress({
-      animeId, malId, title, coverImage, accent,
-      episode: episodeRef.current,
-      type: typeRef.current,
-      playbackTime: currentTime,
-      duration,
-    });
-  }, [animeId, malId, title, coverImage, accent, flushProgress]);
+  }, [embedUrl, episode, type, animeId, malId, title, coverImage, accent, fetchProgress]);
 
   // ── Layout helpers ───────────────────────────────────────────────────────
   const centerRef = useRef<HTMLDivElement>(null);
@@ -190,6 +152,107 @@ export default function WatchClient({
     if (saved !== null) setAutoNext(saved === "true");
   }, []);
 
+  // Listen to postMessage events from the embed player
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Security: verify origin
+      if (!event.origin.includes('megaplay.buzz')) return;
+
+      let data = event.data;
+
+      // Parse if string
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data);
+        } catch (e) {
+          return;
+        }
+      }
+
+      // Handle time tracking events
+      if (data.event === "time" && typeof data.time === "number" && typeof data.duration === "number") {
+        const currentTime = data.time;
+        const duration = data.duration;
+
+        // Only save every 10 seconds to reduce DB writes
+        if (Math.abs(currentTime - lastSavedTimeRef.current) >= 10) {
+          lastSavedTimeRef.current = currentTime;
+          recordProgress({
+            animeId,
+            malId,
+            title,
+            coverImage,
+            accent,
+            episode: episodeRef.current,
+            type: typeRef.current,
+            playbackTime: currentTime,
+            duration,
+          });
+        }
+      }
+
+      // Handle watching-log events (alternative format)
+      if (data.type === "watching-log" && typeof data.currentTime === "number" && typeof data.duration === "number") {
+        const currentTime = data.currentTime;
+        const duration = data.duration;
+
+        if (Math.abs(currentTime - lastSavedTimeRef.current) >= 10) {
+          lastSavedTimeRef.current = currentTime;
+          recordProgress({
+            animeId,
+            malId,
+            title,
+            coverImage,
+            accent,
+            episode: episodeRef.current,
+            type: typeRef.current,
+            playbackTime: currentTime,
+            duration,
+          });
+        }
+      }
+
+      // Handle completion event for auto-next
+      if (data.event === "complete") {
+        // Flush final progress
+        flushProgress({
+          animeId,
+          malId,
+          title,
+          coverImage,
+          accent,
+          episode: episodeRef.current,
+          type: typeRef.current,
+          playbackTime: data.duration || 0,
+          duration: data.duration || 0,
+        });
+
+        // Trigger auto-next if enabled
+        if (autoNext && nextEp) {
+          setCountdown(5);
+          countdownRef.current = setInterval(() => {
+            setCountdown(prev => {
+              if (prev === null || prev <= 1) {
+                clearInterval(countdownRef.current!);
+                countdownRef.current = null;
+                return null;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        }
+      }
+
+      // Handle error events
+      if (data.event === "error") {
+        setError(data.message || "Playback error occurred");
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [animeId, malId, title, coverImage, accent, recordProgress, flushProgress, autoNext, nextEp]);
+
   const cancelCountdown = useCallback(() => {
     if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
     setCountdown(null);
@@ -203,22 +266,6 @@ export default function WatchClient({
       return next;
     });
   };
-
-  const handleEnded = useCallback(() => {
-    if (!autoNext || !nextEp) return;
-    // Start 5-second countdown
-    setCountdown(5);
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          clearInterval(countdownRef.current!);
-          countdownRef.current = null;
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [autoNext, nextEp]);
 
   // When countdown hits null after starting → advance episode
   const prevCountdown = useRef<number | null>(null);
@@ -335,26 +382,21 @@ export default function WatchClient({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black gap-3 z-10 px-4 text-center">
                   <p className="text-sm text-red-400">{error}</p>
                   <Button size="sm" style={{ backgroundColor: accent, color: "white" }}
-                    onPress={() => { setError(null); setLoading(true); setStreamUrl(null); }}>
+                    onPress={() => { setError(null); setLoading(true); setEmbedUrl(null); }}>
                     Retry
                   </Button>
                 </div>
               )}
 
-              {/* JW Player — re-mounts on every new streamUrl via key */}
-              {!loading && !error && streamUrl && (
-                <JWPlayer
-                  key={streamUrl}
-                  src={streamUrl}
-                  tracks={tracks}
-                  accent={accent}
-                  startTime={resumeTargetRef.current}
-                  title={title}
-                  episode={episode}
-                  onTimeUpdate={handleTimeUpdate}
-                  onPause={handlePause}
-                  onEnded={handleEnded}
-                  onError={(msg) => setError(msg)}
+              {/* Embedded Player iframe */}
+              {!loading && !error && embedUrl && (
+                <iframe
+                  key={embedUrl}
+                  src={embedUrl}
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ border: "none" }}
                 />
               )}
 
@@ -399,7 +441,7 @@ export default function WatchClient({
                 </div>
               )}
 
-              {!loading && !error && !streamUrl && (
+              {!loading && !error && !embedUrl && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black">
                   <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Stream unavailable</p>
                 </div>
@@ -469,12 +511,17 @@ export default function WatchClient({
                 <span className="hidden sm:inline">Auto-next</span>
                 {/* Toggle pill */}
                 <span
-                  className="w-6 h-3.5 rounded-full relative transition-colors shrink-0"
+                  className="w-7 h-3.5 rounded-full relative inline-flex items-center transition-colors shrink-0"
                   style={{ backgroundColor: autoNext ? accent : "rgba(255,255,255,0.15)" }}
                 >
                   <span
-                    className="absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform"
-                    style={{ transform: autoNext ? "translateX(13px)" : "translateX(1px)" }}
+                    className="w-2.5 h-2.5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out"
+                    style={{ 
+                      transform: autoNext ? "translateX(14px)" : "translateX(2px)",
+                      position: "absolute",
+                      top: "50%",
+                      marginTop: "-5px"
+                    }}
                   />
                 </span>
               </button>
