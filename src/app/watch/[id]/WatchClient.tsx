@@ -70,7 +70,7 @@ export default function WatchClient({
     );
   }, [episode, type, animeId, malId, router]);
 
-  // Generate embed URL from megaplay.buzz
+  // Generate embed URL using our custom embed wrapper
   useEffect(() => {
     if (!malId) { 
       setError("No MAL ID available"); 
@@ -81,8 +81,9 @@ export default function WatchClient({
     setLoading(true); 
     setError(null);
     
-    // Build embed URL: https://megaplay.buzz/stream/mal/{mal_id}/{episode}/{sub|dub}
-    const url = `https://megaplay.buzz/stream/mal/${malId}/${episode}/${type}`;
+    // Use our custom embed wrapper that mimics MegaPlay's domain verification
+    // This routes through /api/player/mal/{mal_id}/{episode}/{type}
+    const url = `/api/player/mal/${malId}/${episode}/${type}`;
     setEmbedUrl(url);
     setLoading(false);
   }, [malId, episode, type]);
@@ -396,6 +397,7 @@ export default function WatchClient({
                   className="absolute inset-0 w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
+                  referrerPolicy="origin"
                   style={{ border: "none" }}
                 />
               )}
