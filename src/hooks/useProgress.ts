@@ -4,7 +4,7 @@ import { useCallback, useRef } from "react";
 
 export interface ProgressPayload {
   animeId: number;
-  malId: number | null;
+  malId?: number | null; // Optional for backwards compatibility
   title: string;
   coverImage: string;
   accent: string;
@@ -31,7 +31,7 @@ export function useProgress() {
       if (!row) return null;
       return {
         animeId: row.anime_id,
-        malId: row.mal_id,
+        malId: row.mal_id ?? null,
         title: row.title,
         coverImage: row.cover_image,
         accent: row.accent,
@@ -52,7 +52,7 @@ export function useProgress() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         animeId: payload.animeId,
-        malId: payload.malId,
+        malId: payload.malId ?? null,
         title: payload.title,
         coverImage: payload.coverImage,
         accent: payload.accent,

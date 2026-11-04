@@ -22,7 +22,6 @@ interface RelatedMedia {
 
 interface Props {
   animeId: number;
-  malId: number | null;
   title: string;
   coverImage: string;
   bannerImage: string | null;
@@ -42,7 +41,7 @@ const RELATION_LABELS: Record<string, string> = {
 };
 
 export default function WatchClient({
-  animeId, malId, title, coverImage, accent,
+  animeId, title, coverImage, accent,
   initialEpisode, initialType, airedEpisodes, related,
 }: Props) {
   const router = useRouter();
@@ -66,28 +65,22 @@ export default function WatchClient({
   // Sync URL without a full navigation
   useEffect(() => {
     router.replace(
-      `/watch/${animeId}?ep=${episode}&type=${type}${malId ? `&mal=${malId}` : ""}`,
+      `/watch/${animeId}?ep=${episode}&type=${type}`,
       { scroll: false }
     );
-  }, [episode, type, animeId, malId, router]);
+  }, [episode, type, animeId, router]);
 
   // Generate embed URL using our custom embed wrapper
   useEffect(() => {
-    if (!malId) { 
-      setError("No MAL ID available"); 
-      setLoading(false); 
-      return; 
-    }
-    
     setLoading(true); 
     setError(null);
     
-    // Use our custom embed wrapper with autoplay parameter
-    // This routes through /api/player/mal/{mal_id}/{episode}/{type}?autoplay={true|false}
-    const url = `/api/player/mal/${malId}/${episode}/${type}?autoplay=${autoplay}`;
+    // Use AniList ID directly with our custom embed wrapper
+    // This routes through /api/player/anilist/{anilist_id}/{episode}/{type}?autoplay={true|false}
+    const url = `/api/player/anilist/${animeId}/${episode}/${type}?autoplay=${autoplay}`;
     setEmbedUrl(url);
     setLoading(false);
-  }, [malId, episode, type, autoplay]);
+  }, [animeId, episode, type, autoplay]);
 
   const prevEp = airedEpisodes.find((e) => e.episode === episode - 1);
   const nextEp = airedEpisodes.find((e) => e.episode === episode + 1);
@@ -118,7 +111,7 @@ export default function WatchClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          animeId, malId, title, coverImage, accent,
+          animeId, title, coverImage, accent,
           episode, type,
           playbackTime: saved?.episode === episode && saved?.type === type ? saved.playbackTime : 0,
           duration: saved?.episode === episode && saved?.type === type ? saved.duration : 0,
@@ -127,7 +120,7 @@ export default function WatchClient({
     });
     
     return () => { cancelled = true; };
-  }, [embedUrl, episode, type, animeId, malId, title, coverImage, accent, fetchProgress]);
+  }, [embedUrl, episode, type, animeId, title, coverImage, accent, fetchProgress]);
 
   // ── Layout helpers ───────────────────────────────────────────────────────
   const centerRef = useRef<HTMLDivElement>(null);
@@ -181,7 +174,6 @@ export default function WatchClient({
           lastSavedTimeRef.current = currentTime;
           recordProgress({
             animeId,
-            malId,
             title,
             coverImage,
             accent,
@@ -202,7 +194,6 @@ export default function WatchClient({
           lastSavedTimeRef.current = currentTime;
           recordProgress({
             animeId,
-            malId,
             title,
             coverImage,
             accent,
@@ -219,7 +210,6 @@ export default function WatchClient({
         // Flush final progress
         flushProgress({
           animeId,
-          malId,
           title,
           coverImage,
           accent,
@@ -253,7 +243,7 @@ export default function WatchClient({
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [animeId, malId, title, coverImage, accent, recordProgress, flushProgress, autoNext, nextEp]);
+  }, [animeId, title, coverImage, accent, recordProgress, flushProgress, autoNext, nextEp]);
 
   const cancelCountdown = useCallback(() => {
     if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }

@@ -68,7 +68,7 @@ interface AnimeWatchData {
 
 interface Props {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ep?: string; type?: string; mal?: string }>;
+  searchParams: Promise<{ ep?: string; type?: string }>;
 }
 
 export default async function WatchPage({ params, searchParams }: Props) {
@@ -91,8 +91,6 @@ export default async function WatchPage({ params, searchParams }: Props) {
     }
     notFound();
   }
-
-  const malId = sp.mal ? parseInt(sp.mal, 10) : anime.idMal;
 
   // Build episode list:
   // - For FINISHED shows: use media.episodes count to generate all ep numbers
@@ -155,7 +153,6 @@ export default async function WatchPage({ params, searchParams }: Props) {
   return (
     <WatchClient
       animeId={animeId}
-      malId={malId}
       title={title}
       coverImage={anime.coverImage.large}
       bannerImage={anime.bannerImage}

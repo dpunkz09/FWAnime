@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
 // ── POST /api/progress ────────────────────────────────────────────────────
 // Upserts progress for this device + anime.
-// Body: { animeId, episode, type, playbackTime, duration, title, coverImage, accent, malId }
+// Body: { animeId, episode, type, playbackTime, duration, title, coverImage, accent }
 export async function POST(request: NextRequest) {
   const deviceId = request.cookies.get(DEVICE_COOKIE)?.value;
   if (!deviceId) return NextResponse.json({ error: "No device ID" }, { status: 400 });
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     title: string;
     coverImage: string;
     accent: string;
-    malId: number | null;
+    malId?: number | null; // Optional for backwards compatibility
   };
 
   try {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         title: body.title,
         cover_image: body.coverImage,
         accent: body.accent,
-        mal_id: body.malId,
+        mal_id: body.malId ?? null, // Use null if not provided
         updated_at: new Date().toISOString(),
       },
       { onConflict: "device_id,anime_id" }
