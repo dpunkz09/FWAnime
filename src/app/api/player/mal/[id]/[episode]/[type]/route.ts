@@ -5,10 +5,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string; episode: string; type: string }> }
 ) {
   const { id, episode, type } = await params;
+  
+  // Get autoplay from query parameters (default to false)
+  const { searchParams } = new URL(request.url);
+  const autoplay = searchParams.get('autoplay') === 'true' ? 'true' : 'false';
 
   // Build the FlixWorld Anime API embed URL
   // Using malId parameter for MyAnimeList ID
-  const embedUrl = `https://anime-api.flixworld.xyz/api/embed?malId=${id}&episode=${episode}&audio=${type}`;
+  const embedUrl = `https://anime-api.flixworld.xyz/api/embed?malId=${id}&episode=${episode}&audio=${type}&autoplay=${autoplay}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">

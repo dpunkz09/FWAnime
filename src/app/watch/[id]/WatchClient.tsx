@@ -48,6 +48,7 @@ export default function WatchClient({
   const router = useRouter();
   const [episode, setEpisode] = useState(initialEpisode);
   const [type, setType] = useState<"sub" | "dub">(initialType);
+  const [autoplay, setAutoplay] = useState(false); // Autoplay toggle state
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,12 +82,12 @@ export default function WatchClient({
     setLoading(true); 
     setError(null);
     
-    // Use our custom embed wrapper that mimics MegaPlay's domain verification
-    // This routes through /api/player/mal/{mal_id}/{episode}/{type}
-    const url = `/api/player/mal/${malId}/${episode}/${type}`;
+    // Use our custom embed wrapper with autoplay parameter
+    // This routes through /api/player/mal/{mal_id}/{episode}/{type}?autoplay={true|false}
+    const url = `/api/player/mal/${malId}/${episode}/${type}?autoplay=${autoplay}`;
     setEmbedUrl(url);
     setLoading(false);
-  }, [malId, episode, type]);
+  }, [malId, episode, type, autoplay]);
 
   const prevEp = airedEpisodes.find((e) => e.episode === episode - 1);
   const nextEp = airedEpisodes.find((e) => e.episode === episode + 1);
@@ -495,6 +496,38 @@ export default function WatchClient({
                   >{t}</Button>
                 ))}
               </div>
+
+              <Separator orientation="vertical" className="h-6 hidden sm:block" style={{ backgroundColor: "var(--color-border)" }} />
+
+              {/* Autoplay toggle */}
+              <button
+                onClick={() => setAutoplay(prev => !prev)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors text-[10px] font-bold shrink-0"
+                style={{
+                  backgroundColor: autoplay ? `${accent}20` : "rgba(255,255,255,0.05)",
+                  color: autoplay ? accent : "var(--color-text-muted)",
+                  border: `1px solid ${autoplay ? `${accent}44` : "var(--color-border)"}`,
+                }}
+                title={autoplay ? "Autoplay: ON" : "Autoplay: OFF"}
+              >
+                <Play size={12} />
+                <span className="hidden sm:inline">Autoplay</span>
+                {/* Toggle pill */}
+                <span
+                  className="w-7 h-3.5 rounded-full relative inline-flex items-center transition-colors shrink-0"
+                  style={{ backgroundColor: autoplay ? accent : "rgba(255,255,255,0.15)" }}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out"
+                    style={{ 
+                      transform: autoplay ? "translateX(14px)" : "translateX(2px)",
+                      position: "absolute",
+                      top: "50%",
+                      marginTop: "-5px"
+                    }}
+                  />
+                </span>
+              </button>
 
               <Separator orientation="vertical" className="h-6 hidden sm:block" style={{ backgroundColor: "var(--color-border)" }} />
 
